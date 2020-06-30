@@ -1,0 +1,168 @@
+---
+title: "Investigation 1"
+author: "Emily"
+date: "6/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+{
+  c("alphahull",     # To calculate the convex hull
+    "ca",            # Correspondence analysis
+    "conflicted",    # To deal with conflicting function names
+    # I've had some strangeness with this
+    #  script. I suspect package:conflicted,
+    #  but I don't yet know for sure.
+    "data.table",    # Fast data input/output
+    "dplyr",         # This is all of tidyverse that gets used here
+    "dtplyr",        # dplyr syntax with a data.table backend
+    "here",          # To find/store files w/o setwd() and getwd()
+    "igraph",        # Basic network tools; we'll use statnet mostly
+    "igraphdata",    # Some useful datasets
+    "intergraph",    # Translate between igraph and statnet formats
+    "lmPerm",        # To do permutation tests
+    "statnet",      # A suite of network tools, including ERGM and more
+    "xlsx"
+  ) -> package_names
+  
+  for (package_name in package_names) {
+    if (!is.element(package_name, installed.packages()[, 1])) {
+      install.packages(package_name,
+                       repos = "http://cran.mtu.edu/")
+      # An alternate, just in case.
+      #                      repos="http://lib.stat.cmu.edu/R/CRAN")
+    }
+    library(
+      package_name,
+      character.only = TRUE,
+      quietly = TRUE,
+      verbose = FALSE
+    )
+  }
+  rm(list = c("package_name", "package_names"))
+}
+
+set_here()
+
+# Because I like these options:
+options(show.signif.stars = FALSE)
+options(digits = 4)
+
+install.packages("Rtools")
+
+```
+Your task for this investigation is to produce two different network plots:
+
+Graph 1: People accused as the nodes
+Graph 2: Corruption cases as the nodes
+
+Note that each graph will be different, but that two people are linked if they are in the same case, while two cases are linked if they share accused defendants. The edges will have weights, too. We are only interested in those people or cases that are linked, so any node that isn't linked to at least one other node should be dropped. 
+
+Three data files are attached. They come originally from Casos Aislados, which has been collating this information from news sources and court documents.
+
+The list of cases and people accused in each of them
+The file of relations within people accused
+The file of relations within corruption cases
+Create useful network plots for each of these two situations. The goal is to allow the viewer to get information from the plots.
+
+
+
+```{r load the data in}
+fread("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/cases_and_accused.csv", colClasses = "character")->caa_df
+fread("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/relations_accused.csv")->ra_df
+fread("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/relations_cases.csv")->rc_df
+caa_df
+ra_df
+rc_df
+as.matrix(fread("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/cases_and_accused.csv",header=TRUE))->caa_mat
+as.matrix(fread("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/relations_accused.csv"))->ra_mat
+as.matrix(fread("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/relations_cases.csv"))->rc_mat
+
+```
+
+Read in data above, going to do some very basic things to look at it a bit more and ensure the stucture of the data is okay. 
+
+
+
+```{r}
+network(rc_mat,directed=TRUE)->rc_mat
+
+plot(rc_mat)
+
+network(caa_mat,directed = TRUE)->caa_net
+plot(caa_net)
+
+
+#okay, so clearly large and somewhat messy, also I struggle with the combining of df to generate the Networks
+
+```
+
+```{r graph 1}
+
+library(igraph)
+
+#those accused 
+acused_gr<-(graph_from_data_frame(ra_df[,c("accused_1","accused_2")],directed = FALSE, vertices = unique(caa_df$accused)))
+ E(acused_gr)$weight<-ra_df$cases_in_common # edges 
+
+#cases 
+cases_gr<-graph_from_data_frame(rc_df[,c("case_1","case_2")],directed = FALSE, vertices =unique(caa_df$case))
+
+E(cases_gr)$weight <-rc_df$accused_in_common #edges 
+ 
+
+#looking that the graph 
+plot(cases_gr,vertex.label=NA,vertex.size=5,vertex.color="blue")
+ 
+#so at this point theres alot of single nodes, or cases involving people who havent been accused in other cases.
+
+#lets try removing those isolated cases 
+
+Isolated = which (igraph::degree(cases_gr)==0)
+
+cases_gr=igraph::delete.vertices(cases_gr,Isolated)
+
+plot(cases_gr,vertex.label=NA,vertex.size=5,vertex.color="orange", main="Graph 1: People Accused as Nodes") 
+```
+
+
+```{r graph 2}
+#corruption cases as the nodes... 
+component_case <-igraph::components(cases_gr)
+comp_case_size<-sizes(component_case)
+
+comp_gr<-which(comp_case_size>1)
+
+comp_case_gr<-induced_subgraph(cases_gr,vids=which(membership(component_case)%in%comp_gr))
+
+plot(comp_case_gr,vertex.label=NA,vertex.size=4,vertex.color="red")
+
+#lol thanks google, I just did the same steps I had already acheived.. thats what I get for incorreclty reading
+
+
+accused_p<-subset(caa_df,case %in% V(comp_case_gr)$name)
+
+accused_p_gr<-induced_subgraph(acused_gr,vids = accused_p$accused)
+
+bplot<-which.max(comp_case_size) #maximize case sizes from the mt
+
+cases_plt1<-induced_subgraph(cases_gr,vids= which(membership(component_case)==bplot))
+
+
+accused_plot1<-subset(caa_df,case %in% V(cases_plt1)$name)
+
+acused_plot1_gr<-induced_subgraph(acused_gr,vids=accused_plot1$accused)
+
+
+layout_accusedplt1 <- layout_nicely(acused_plot1_gr)
+
+plot(acused_plot1_gr,layout=layout_accusedplt1,vertex.label=NA,vertex.size=4, main= "Graph 2: Cases as the Nodes")
+```
+
+
+
+
+
+
+
+
