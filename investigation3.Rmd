@@ -1,0 +1,181 @@
+---
+title: "Investigation3"
+author: "Emily"
+date: "6/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+{
+  c("alphahull",     # To calculate the convex hull
+    "ca",            # Correspondence analysis
+    "conflicted",    # To deal with conflicting function names
+    # I've had some strangeness with this
+    #  script. I suspect package:conflicted,
+    #  but I don't yet know for sure.
+    "data.table",    # Fast data input/output
+    "dplyr",         # This is all of tidyverse that gets used here
+    "dtplyr",        # dplyr syntax with a data.table backend
+    "here",          # To find/store files w/o setwd() and getwd()
+    "igraph",        # Basic network tools; we'll use statnet mostly
+    "igraphdata",    # Some useful datasets
+    "intergraph",    # Translate between igraph and statnet formats
+    "lmPerm",        # To do permutation tests
+    "statnet",      # A suite of network tools, including ERGM and more
+    "xlsx"
+  ) -> package_names
+  
+  for (package_name in package_names) {
+    if (!is.element(package_name, installed.packages()[, 1])) {
+      install.packages(package_name,
+                       repos = "http://cran.mtu.edu/")
+      # An alternate, just in case.
+      #                      repos="http://lib.stat.cmu.edu/R/CRAN")
+    }
+    library(
+      package_name,
+      character.only = TRUE,
+      quietly = TRUE,
+      verbose = FALSE
+    )
+  }
+  rm(list = c("package_name", "package_names"))
+}
+
+set_here()
+
+# Because I like these options:
+options(show.signif.stars = FALSE)
+options(digits = 4)
+
+install.packages("Rtools")
+
+```
+
+
+## the prompt 
+
+Although your instructor has never seen an episode, Game of Thrones was a dominant force in popular culture in the 2010s. Hence, we should look at it. The data for the eight seasons are available by running the following script (assuming you have package:purrr installed):
+
+paste0("https://raw.githubusercontent.com/mathbeveridge/gameofthrones/master/data/got-s",1:8,"-edges.csv") -> edges
+purrr::map(edges,read_csv) -> edges_tbl
+
+(Reminder: Copying quotation marks into R may, depending upon your browser or other source of the quotation marks, put in the wrong symbol. The quotation marks in the above lines of code should copy just fine for everyone, but I haven't checked all possibilities. So be careful!)
+
+For this investigation, you should do something useful and/or interesting with these data. For example:
+
+You could look at various measures of centrality. Which ones are important, and why? (You might even want to investigate package:keyplayer.)
+You could investigate the roles that certain characters have (e.g., who is a gatekeeper?)
+
+You could make variouscentrality plots. (You might even investigate graphlayouts::layout_with_centrality() for neat plots.)
+You could use your skills from last week, and try some ERGM or QAP (e.g., how do the various families line up?). The latter is a bit tricky because the the families do not all have the same number of nodes, so things like a correlation have to be modified, if done at all.
+You can use your own creativity and work with other possibilities, too.
+```{r get the data}
+install.packages("purrr")
+library(purrr)
+library(tidyverse)
+library(igraph)
+install.packages("ggraph")
+install.packages("dplyr")
+library(graphlayouts)
+library(ggraph)
+library(dplyr)
+
+paste0("https://raw.githubusercontent.com/mathbeveridge/gameofthrones/master/data/got-s",1:8,"-edges.csv") -> edges
+purrr::map(edges,read_csv) -> edges_tbl
+
+edges_tbl
+
+got_graphs <- map(1:7,function(x) {
+    g <- graph_from_data_frame(edges_tbl[x],directed = F)
+    g$title <- paste0("Season ",x)
+    g
+  }) #taking the raw edges and converting it into an igraph
+
+#did I google how to read this in? yes, because thats not my strong suit and frankly that information seems to have been a bit lacking and really dont do this outside of this program soo 
+
+
+mutate_graph <- function(x){
+  V(x)$name <- str_replace_all(V(x)$name,"\\_"," ") %>% 
+    str_to_title()
+  clu <- cluster_louvain(x)
+  V(x)$clu <- as.character(clu$membership)
+  V(x)$size <- graph.strength(x)
+  x
+} #we transform and add some node variables. First, we change the character names from upper case to title case. Then we compute a clustering, and the total number of interactions per character. Im think this may not have been what to do 
+
+got_graphs <- map(got_graphs,mutate_graph)
+
+#got_graphs should now have all seven season networks in a list 
+
+
+
+
+```
+
+#graphing/ exploring here: 
+
+```{r graphs and exploration}
+plot(got_graphs[[1]],vertex.label=NA) # season 1 
+
+plot(got_graphs[[2]],vertex.label=NA) #season 2, some subgroups occur 
+
+plot(got_graphs[[3]],vertex.label=NA) # you get the idea 
+plot(got_graphs[[4]],vertex.label=NA)
+plot(got_graphs[[5]],vertex.label=NA)
+plot(got_graphs[[6]],vertex.label=NA) # a small subgroup here 
+plot(got_graphs[[7]],vertex.label=NA) # somewhat similar to one but not really 
+
+#so that was all of the seasons
+
+#found the game of thrones color palette online - or at least a color palett someone made and associated with GOT 
+
+got_palette <- c("#1A5878","#C44237","#AD8941","#E99093",
+                 "#50594B","#DE9763","#5D5F5D","#E2E9E7")
+
+#lets just look at the last season 
+
+plot(got_graphs[[7]],vertex.label.distance=5,vertex.lable.cex=2,vertex.color=palette(got_palette), vertex.size=4) #really the labels just dont look good even after playing around with that 
+
+plot(got_graphs[[7]],vertex.label=NA,vertex.color=palette(got_palette), vertex.size=6) #really the labels just dont look good even after playing around with that 
+
+
+
+
+
+
+```
+```{r}
+
+
+got_all <- map_dfr(edges_tbl,bind_rows) %>% 
+  group_by(Source,Target) %>% 
+  summarise(Weight=sum(Weight)) %>% 
+  ungroup() %>% 
+  rename(weight=Weight) %>% 
+  mutate_if(is.character,function(x) str_replace_all(x,"\\_"," ") %>% 
+              str_to_title()) %>% 
+  graph_from_data_frame(directed=FALSE)
+
+clu <- cluster_louvain(got_all)
+V(got_all)$clu <- as.character(clu$membership)
+V(got_all)$size <- graph.strength(got_all)
+
+plot(got_all,vertex.size=3,vertex.label=NA,vertex.color=palette(got_palette)) #this is interesting there is a def subgroup over to the right, this is all season combined. This makes sens because there were at least two seasons we saw subgroup emerge 
+
+
+
+```
+```{r subgroups?}
+
+#lets look at blocks from season where there were subgroups? that seems like something thats intersting as most plots lines have charcters that are connected in some way. Seems like the making of a good story that we may have a seperate group/network that then becomes 
+
+
+# looking at cohesvive blocks or determining hierarchical subsets of graph vertices based on their structural cohesion (or vertex connectivity)
+gotblocks <- cohesive_blocks(got_graphs[[2]])
+plot(gotblocks, got_graphs[[2]], vertex.label=NA, vertex.size=5, vertex.color=palette(got_palette))# pretty certain my color palett was ignored here lol 
+#intersting to see the numerous subsets of the graph based on the connectivity of the characters. 
+
+```
+
