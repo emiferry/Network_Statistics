@@ -1,0 +1,316 @@
+---
+title: "homework5"
+author: "Emily"
+date: "6/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+{
+  c("alphahull",     # To calculate the convex hull
+    "ca",            # Correspondence analysis
+    "conflicted",    # To deal with conflicting function names
+    # I've had some strangeness with this
+    #  script. I suspect package:conflicted,
+    #  but I don't yet know for sure.
+    "data.table",    # Fast data input/output
+    "dplyr",         # This is all of tidyverse that gets used here
+    "dtplyr",        # dplyr syntax with a data.table backend
+    "here",          # To find/store files w/o setwd() and getwd()
+    "igraph",        # Basic network tools; we'll use statnet mostly
+    "igraphdata",    # Some useful datasets
+    "intergraph",    # Translate between igraph and statnet formats
+    "lmPerm",        # To do permutation tests
+    "statnet",      # A suite of network tools, including ERGM and more
+    "xlsx"
+  ) -> package_names
+  
+  for (package_name in package_names) {
+    if (!is.element(package_name, installed.packages()[, 1])) {
+      install.packages(package_name,
+                       repos = "http://cran.mtu.edu/")
+      # An alternate, just in case.
+      #                      repos="http://lib.stat.cmu.edu/R/CRAN")
+    }
+    library(
+      package_name,
+      character.only = TRUE,
+      quietly = TRUE,
+      verbose = FALSE
+    )
+  }
+  rm(list = c("package_name", "package_names"))
+}
+
+set_here()
+
+# Because I like these options:
+options(show.signif.stars = FALSE)
+options(digits = 4)
+
+install.packages("Rtools")
+```
+
+BEJ, Chapter 11, Problem 1
+
+```{r}
+read.ucinet.header("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/Data/campnet") -> camp_hdr
+read.ucinet("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/Data/campnet") -> camp_mat
+camp_hdr$dim.labels[[1]] -> rownames(camp_mat) ->
+colnames(camp_mat)
+
+
+symmetrize(camp_mat, rule="weak", return.as.edgelist=FALSE)->campsym_mat #?is this the correct function to be using? I feel like no once again 
+
+
+network(campsym_mat,directed =FALSE)->campnet_maxsym
+
+plot(campnet_maxsym)
+
+#
+
+```
+looking at the plot, it sort of seems like there are three subgroups occruing and really there are only one or two ties that are connecting these subgroups 
+
+
+BEJ, Chapter 11, Problem 2
+```{r}
+
+graph_from_adjacency_matrix(campsym_mat)->campsym_gr
+
+cliques(campsym_gr, min = NULL, max = NULL)
+#so that yeilded 74 cliques? that seems alot more then that was thought - and again NOT RIGHT, possibly I need to use max cliques 
+max_cliques(campsym_gr,       
+            min = 2)  #so I thik that yeilded 15 cliques??
+
+#I was supposed to have used this data set ? 
+
+read.ucinet.header("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/Data/campnet-maxsym") -> campmaxsym_hdr
+read.ucinet("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/Data/campnet-maxsym") -> campmaxsym_mat
+
+graph_from_adjacency_matrix(campmaxsym_mat)->campms_gr
+
+
+
+max_cliques(campms_gr,min=2) # okay I still get 15. YEs, Many actors are appearing in multiple cliques 
+
+
+```
+
+there are 15 ( seems high) cliques that resulted, and yes, there are a number of overlapping memberships/actors in the various cliques. 
+
+
+BEJ, Chapter 11, Problem 3
+
+```{r}
+
+
+max_cliques(campms_gr,min=2) ->mcs
+
+matrix(0,
+       nrow = nrow(campmaxsym_mat),
+       ncol = ncol(campmaxsym_mat),
+       dimnames = list(rownames(campmaxsym_mat),
+                       colnames(campmaxsym_mat))) -> overlaps
+
+
+for(index in 1:(length(mcs))) {
+  for(r in 1:(length(mcs[[index]]))) {
+    for(c in 1:(length(mcs[[index]]))) {
+      overlaps[mcs[[index]][r],mcs[[index]][c]] + 1 -> 
+        overlaps[mcs[[index]][r],mcs[[index]][c]]
+    }
+  }
+}
+
+overlaps # Im struggleing a bit to read that input, I believe its proably anything greater then 2, so 4ish subgroups ? 
+
+```
+
+BEJ, Chapter 11, Problem 4
+```{r}
+matrix(0,
+       ncol = length(mcs),
+       nrow = gorder(campms_gr),
+       dimnames = list(rownames(campmaxsym_mat))) -> bimodal1_mat #I took out the 1:5, which I know is probably important in the structure but even after changing to 1:18 ( size of orignal) and a few other options, I was having a hard time with wrros as dimnames was not equal to the array extent 
+
+for(clique in 1:(length(mcs))) {
+  for(vert in 1:(length(mcs[[clique]]))) {
+    1 -> bimodal1_mat[mc[[clique]][vert], clique]
+  }
+}
+
+
+#this is telling me its not a graph... the text example didnt use a graph ?
+
+#the goal for a bimodal matrix being a matrix where the rows and columns index different sets of entities (e.g., the rows might correspond to persons while the columns correspond to organizations).
+
+#after I finshed the bimodal matrix 
+graph_from_incidence_matrix(bimodal_mat) -> bimodal_gr
+set.seed(42)
+plot(bimodal_gr,
+     vertex.shape = ifelse(V(bimodal_gr)$type == TRUE,
+                           "square", "circle"),
+     vertex.rot = 45,
+     vertex.col = c(rep("gray", 19), rep("cyan", 5)),
+     vertex.label.dist = 1.5,
+     vertex.label.color = "black")
+
+
+
+
+
+
+```
+
+BEJ, Chapter 11, Problem 5
+```{r}
+#2, 3 , 4 "block" solutions 
+
+network(campmaxsym_mat,directed = FALSE)->camp3_net
+graph_from_literal(camp3_net)->camp3_gr
+
+campblocks<-cohesive_blocks(camp3_gr)
+
+campblocks
+
+plot(campblocks,camp3_gr,vertex.lable=V(camp3_gr)$name,margin=-0.2,vertex.shape="rectangle",vertex.size=24, vertex.size2=8,
+     mark.border=1, colbar=c(NA, NA,"cyan","orange"))#lol that literally did nothing 
+
+
+camp <- graph_from_literal(Harry:Steve:Don:Bert - Harry:Steve:Don:Bert,
+                           Pam:Brazey:Carol:Pat - Pam:Brazey:Carol:Pat,
+                           Holly   - Carol:Pat:Pam:Jennie:Bill,
+                           Bill    - Pauline:Michael:Lee:Holly,
+                           Pauline - Bill:Jennie:Ann,
+                           Jennie  - Holly:Michael:Lee:Ann:Pauline,
+                           Michael - Bill:Jennie:Ann:Lee:John,
+                           Ann     - Michael:Jennie:Pauline,
+                           Lee     - Michael:Bill:Jennie,
+                           Gery    - Pat:Steve:Russ:John,
+                           Russ    - Steve:Bert:Gery:John,
+                           John    - Gery:Russ:Michael)
+campBlocks <- cohesive_blocks(camp)
+campBlocks
+
+plot(campBlocks, camp, vertex.label=V(camp)$name, margin=-0.2,
+     vertex.shape="rectangle", vertex.size=24, vertex.size2=8,
+     mark.border=1, colbar=c(NA, NA,"cyan","orange") )
+
+#thats what the text book example was- mine should have looked like that, also I was supposed to have used different sets of blocks/ block amounts 
+
+graph_from_adjacency_matrix(campmaxsym_mat,mode = "undirected")->campms2_gr
+
+
+cohesive_blocks(campms2_gr,labels = TRUE)->cb
+
+blocks(cb)
+
+graphs_from_cohesive_blocks(cb, campms2_gr)
+
+igraph::hierarchy(cb)
+parent(cb)
+
+plot(cb,campms2_gr) # hey I think I got something to work yay, just ingoring the part where I was supposed to haev done different groups of blocks.. 
+
+
+
+```
+
+BEJ, Chapter 11, Problem 7
+In camparison of various methods for detecting subgroups, I would conclude that the method you choose to use really depends on what your goal for the data might be, the structure of the data, what you might be looking to explain and the overall model you are looking to acheieve. In otherwords, the method you use should make sense with the context of the data. 
+
+---- 
+BEJ, Chapter 12, Problem 1 (Well, really, just do the clustering and find the nodes that a structurally equivalent. Follow the process from Chapter 11 for the former.)
+```{r}
+read.ucinet.header("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/Data/campnet-maxsym") -> campmaxsym_hdr
+read.ucinet("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/Data/campnet-maxsym") -> campmaxsym_mat
+
+#use default euclidean distance ... 
+
+sedist(campmaxsym_mat,method="euclidean",joint.analysis = TRUE)-> dist # okay that actually worked, not sure hat what I really wanted to do... I dont ahev an array or anything #ummm not it probably wasnt what I wanted 
+  
+#looking at the text and examples and google and prob more like 12.7? Is more/ closerish to what I prob need to do here 
+
+
+equiv.clust(campmaxsym_mat)->camp_clust
+
+blockmodel(campmaxsym_mat,camp_clust,k=3)->camp_bm
+
+camp_bm
+
+plot(camp_clust)
+
+plot(camp_bm) #oh boy I dont think this is something one should really plot and try to look at lol 
+
+
+
+
+
+
+
+```
+
+BEJ, Chapter 12, Problem 2 (As in problem 6; just do the clustering and find equivalent nodes.)
+```{r}
+as.matrix(fread("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/Data/WIRING_RDGAM.csv",header=TRUE))->game_mat
+as.matrix(game_mat[,-1]) -> game_mat
+colnames(game_mat) -> rownames(game_mat)
+games_mat
+
+equiv.clust(games_mat)->game_clust
+
+blockmodel(games_mat,game_clust,k=3)->game_bm
+
+game_bm
+
+plot(game_clust)
+
+
+
+
+
+
+
+```
+
+Exercise 5 from the Easley & Kleinberg preprint, Section 3.7.
+
+In the social network depicted in Figure 3.24, with each edge labeled as either a strong or weak tie, which nodes satisfy the Strong Triadic Closure Property from Chapter 3, and which do not? Provide an explanation for your answer.
+
+the strong triadic closure property states that if a node has strong ties to two neighbors, then these neighbors must had at least a weak tie between them, 
+
+
+I would say, that node B, C, and E are in voilation as there are strong ties between Cb, CE but no ties between BE. I guess that A,B,C would be an example of the triadic closure property, even though there are strong ties allaround, the nodes. 
+
+----
+
+Exercise 4 from the Easley & Kleinberg preprint, Section 4.6.
+
+Given a network showing pairs of people who share activities, we can try to reconstruct an affiliation network consistent with this data.
+
+For example, suppose that you are trying to infer the structure of a bipartite affiliation network, and by indirect observation you’ve obtained the projected network on just the set of people, constructed as in Exercise 2: there is an edge joining each pair of people who share a focus. This projected network is shown in Figure 4.22.
+
+(a) Draw an affiliation network involving these six people, together with four foci that you should define, whose projected network is the graph shown in Figure 4.22.
+
+
+```{r}
+#well this is a struggle to comprehend ... 
+
+matrix(c(0, 1, 1, 2, 1, 2,
+         1,0,
+         1 
+         2
+         1
+         2))
+
+```
+
+
+
+(b) Explain why any affiliation network capable of producing the projected network in Figure 4.22 must have at least four foci.
+
+A graph is bipartite ( affliation networks) if its nodes can be divided into two sets in such a way that every edge connects a node in one set to a node in the other set. (In other words, there are no edges joining a pair of nodes that belong to the same set; all edges go between the two sets.) Image 4.22 is basically a square split into fourish regions, the lack of deges joining E, F, B and C highlighting the sets and breaking out four foci at the least? If that makes sense because its real loose in my head so. 
+
+
+
