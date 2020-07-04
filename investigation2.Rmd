@@ -1,0 +1,127 @@
+---
+title: "Investigation2"
+author: "Emily"
+date: "6/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+{
+  c("conflicted",    # To deal with conflicting function names.
+                     # I've had some strangeness with this
+                     #  script. I suspect package:conflicted,
+                     #  but I don't yet know for sure.
+    "data.table",    # Fast data input/output
+    "dplyr",         # This is all of tidyverse that gets used here
+    "drat",          # Needed for a possible install below 
+    "dtplyr",        # dplyr syntax with a data.table backend
+    "here",
+    "igraph",        # Basic network tools; we'll use statnet mostly
+    "igraphdata",    # Some useful datasets
+    "intergraph",    # Translate between igraph and statnet formats
+    "NetData",       # Network data package
+    "statnet"        # A suite of network tools, including ERGM and more
+  ) -> package_names
+  
+  for (package_name in package_names) {
+    if (!is.element(package_name, installed.packages()[, 1])) {
+      install.packages(package_name,
+                       repos = "http://cran.mtu.edu/")
+    }
+    library(
+      package_name,
+      character.only = TRUE,
+      quietly = TRUE,
+      verbose = FALSE
+    )
+  }
+  rm(list = c("package_name", "package_names"))
+  
+  # Load one package via drat, if needed
+  if (!is.element("networkdata", installed.packages()[, 1])) {
+    addRepo("schochastics")
+    install.packages("networkdata")
+  }
+  library(
+    "networkdata",
+    character.only = TRUE,
+    quietly = TRUE,
+    verbose = FALSE
+  )
+}
+
+set_here()
+
+# Because I like these options:
+options(show.signif.stars = FALSE)
+options(digits = 4)
+```
+
+##the Prompt 
+The attached ZIP file has the full network data (except for isolates) from 100 US universities' Facebook networks in 2005. (This was back when you could get Facebook data with less hassle than you can now.) It also has a paper that looked at the data, and a file describing the data. The analyses that were performed did not include any ERGM though, so your task is to do something interesting with these data - you must include ERGM as part of that - and write it up. When you are finished, make a GitHub repository for your work, and submit only a link to that repository as your assignment.
+
+Notice that I'm intentionally leaving this wide open; do what seems interesting to you, and if you want to add in the network model trees, then so be it. (E.g., Pick a single university and look deeply at it. Or pick a few universities and look for similarities in structure. Or....whatever you want.) Just do something good.
+
+The data are in MATLAB format, so you'll probably want to use something like package:R.matlab to read the data.
+
+##About the data then 
+
+the files include only intra-school links,Each of the school .mat files has an A matrix (sparse) and a
+"local_info" variable, one row per node: a student/faculty status
+flag, gender, major, second major/minor (if applicable), dorm/house,
+year, and high school. Missing data is coded 0.
+
+
+##the investigation 
+
+```{r reading in the data}
+install.packages("R.matlab")
+library(R.matlab)
+library(igraph)
+
+?R.matlab
+
+?writeMat
+
+writeMat("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/facebook100/Harvard1.mat",fixNames = TRUE)->harvard1
+
+readMat(file="C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/facebook100/Harvard1.mat",sparseMatrixClass=c("sparseM"))->harvard
+
+
+readMat("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/facebook100/Harvard1.mat", fixNames = TRUE, sparseMatrixClass=c("Matrix", "SparseM", "matrix"))->hdata
+
+#hdata->data.frame(hdata)
+hdata
+
+data
+as.matrix(data)->data_mat
+data_mat
+#going to use harvard because I like boston and this is prob as close as ill ever get to Harvard lol 
+
+
+
+
+```
+
+
+Okay, so I read the data in technically, but It yeilds in a list of one, which when I look at the data ,its hasa header, but I cant figure out how to view it or convert it. I spent an abnormal amount of time trying to google and read rpubs, about the ReadMat and WriteMat and R.matlab funcitons and looking at examples. I cant understand what Im missing or what the goal of the data. I am afraid I cant afford to loose points since nothign has been graded, but for the sake of trying to get more then a zero on this Ill just go through ERGM and what I know in hopes of gaining at least one point? 
+
+##About ERGM, Since I am struggling with basics 
+ERGM( or a p*) is a statistical model in which you can explore the underlying dynamics of your network and take a look at interactions occuring with the data and overall analyize your data. 
+
+If you have a hypotehsis about a set of data making up your network and you'd like to test the hypothesis, you'd need to have two adjacency matrices, and you'd want to correlate them. The book disucusses SPSS and Stata to acomplish such a task, which obviously we do in R, but something to note is these outside programs use vectors to correltate,so you'd need to reshape your matrices to do so. 
+
+Signifigance tests can also make assumptions about the data which are violated by network data. Often in network data, the disttribution of the population values is not normal or is unkown, and the data itself is more like a population opposed to a random sample. Due to this, we use approaches developed for statistical models speciffically designed for studying the distribution of ties in a network. This is the approach that  ERGMS, or eponential random graph models use. With ERGM's non-independace on the data are explicity modelled and accounted for, but you must know which dependencies to include in the model ( think about the model, what it includes and what your overall goal might be). The end model though will quanify the relative impoantance of these different dependancices and highlights which may be at the forefront of your theories. 
+
+With ERGM, you are generating a bunch of random graphs, by certain dynamics and you campaire them to the graph in question. you are looking to examine, micr-macro linkages, "Do we have somthing at a small level , and does the network look like that particular thing?" Looking at AIC and BIC to indicate whether or not we generated soemthing similar. We assume when modeling ERGM, that all ties are probilistic, not determisistic ( thats seperate from ERGM), there is a conditionall dependent, and all nodes are condisered to be homogenous ( nodes can have diff properties, but we assume they all have the same tendencies)
+
+There are a few probelems/drawbacks to take into consideration with ERGMs in R,due to the complexities that occcure in R, one of them being the lack of convergence, as we learned this is often because of "unconstranied MCMC samplining not mixing". 
+
+
+##Mechanics of it 
+
+Start with a network that is jsut edges, stars, triangles (basic), then add the fancier things in ( like covariates) one by one, ( trying to stay close to the theory or your desired outcomes) and at each step esimate your new parameter values, AIC or BIC, forcusing on just one. I tend to look at just AIC. If what you are adding in doesnt generate a lower AIC then previously, the aspect you just added in doesnt improve the model, or add to the theory, and therefore is not at the forefront of the model to consdier.You are looking for a lower AIc model. 
+
+
+
