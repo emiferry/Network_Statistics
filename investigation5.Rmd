@@ -1,0 +1,155 @@
+---
+title: "invest5"
+author: "Emily"
+date: "7/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+{
+  c("alphahull",     # To calculate the convex hull
+    "ca",            # Correspondence analysis
+    "conflicted",    # To deal with conflicting function names
+    # I've had some strangeness with this
+    #  script. I suspect package:conflicted,
+    #  but I don't yet know for sure.
+    "data.table",    # Fast data input/output
+    "dplyr",         # This is all of tidyverse that gets used here
+    "dtplyr",        # dplyr syntax with a data.table backend
+    "here",          # To find/store files w/o setwd() and getwd()
+    "igraph",        # Basic network tools; we'll use statnet mostly
+    "igraphdata",    # Some useful datasets
+    "intergraph",    # Translate between igraph and statnet formats
+    "lmPerm",        # To do permutation tests
+    "statnet",      # A suite of network tools, including ERGM and more
+    "xlsx"
+  ) -> package_names
+  
+  for (package_name in package_names) {
+    if (!is.element(package_name, installed.packages()[, 1])) {
+      install.packages(package_name,
+                       repos = "http://cran.mtu.edu/")
+      # An alternate, just in case.
+      #                      repos="http://lib.stat.cmu.edu/R/CRAN")
+    }
+    library(
+      package_name,
+      character.only = TRUE,
+      quietly = TRUE,
+      verbose = FALSE
+    )
+  }
+  rm(list = c("package_name", "package_names"))
+}
+
+set_here()
+
+# Because I like these options:
+options(show.signif.stars = FALSE)
+options(digits = 4)
+
+install.packages("Rtools")
+```
+
+The attached Amazon data archive contains (a) a network of about a quarter-million Amazon co-purchases from March 2, 2003, (b) a file with some metadata for those purchases (the ID in this file matches the node IDs in the network file), and (c) a sample of the the file in part (b), because that file is huge. Note carefully that the metadata file is formatted, but it definitely is not a nice rectangular format, so reading that file will require some cleverness. (For starters, I would recommend heavy use of the "skip" parameter in fread(), or else learning about the scan() function. Working with text strings will be necessary too.)
+
+Here's a very important note: package:igraph requires all nodes to have positive indices. Hence, the 6 places in the edgelist file where the product ID is "0" will cause an error if you try to create a graph. You should fix those somehow before you go to create the graph.
+
+Using these data, you should do the following:
+
+Obviously, this would be a hairball if plotted. Figure out some better plots, whether those be targeted plots, or pruned, or whatever.
+This is a good network on which to consider the effect of pruning a network on the characteristics of that network. Pick any two network characteristics, a method of pruning the network to get smaller and smaller induced subgraphs, and then look at how your chosen network characteristics vary as the pruning proceeds. (You need to be careful here: Some network characteristic calculations will take a loooong time to compute on the full network!)
+When your pruned network is small enough, you should do some page rank analyses. Do it on the products, or the recommenders, or whatever.
+Do anything else that may catch your fancy. (ERGM, anyone? Comparing the ego networks of individual products?)
+This project will seriously test your skills and creativity; hence, the HW this week is only worth 5 points, while the investigation is worth 10. (That's opposite from most other weeks.) Put your work in a repository, and submit a link to that repository for this assignment. This is due on June 29.
+
+
+```{r}
+fread("C:/Users/Emily_Ferry/Desktop/SJFC/Borgatti-master/investData/amazon-2003-03-02.txt",skip="__auto__", header=TRUE)->amazon
+
+
+amazon # do I want header = tRUE of =FALSE?, I think FALSE ..... I can tell this is going to be painfull 
+as.matrix(amazon)->amazon_mat
+amazon_mat
+
+ amazon_mat[which(rowSums(amazon_mat) > 0),]->amazon2_mat #did not do what I thought it would cool cool 
+amazon2_mat
+
+amazon_mat[1:max(which(rowSums(amazon_mat != 0) > 0)), ]->amazon2_mat
+amazon2_mat # nope still not working
+
+index = apply(amazon_mat == 0, MARGIN = 1, any)
+
+amazon_mat #still no 
+
+mat1<- (amazon_mat[,-1])
+mat1 # um maybe ??? Idk Its been an hour of me reading the internet and trying random code ( not all pictured ) to figure this out 
+
+
+#heres me trying more random things from chapter 14 
+
+list("niter" = 10) -> layout_pars
+
+gplot(mat1,
+      gmode = "graph",
+      vertex.sides = 4,
+      vertex.rot = 45,
+      layout.part = layout_pars)
+
+
+0 -> mat1[which(mat1<5)] #taking out ties less then 5?? 
+
+
+
+
+
+```
+
+
+```{r}
+
+#okay so after legit five and a half hours I gave up on running this - I dont have more time to waste. 
+
+0 -> mat1[which(mat1<5)]#taking out ties less then 5?? 
+
+graph_from_data_frame(mat1,directed=TRUE)
+
+network(mat1,dirtected= FALSE)->am_net
+kcores(am_net,mode ="graph")->kca
+
+which(kca>10)-> kca10
+
+amazon_mat[kca10,kca10]->am10
+set.seed(42)
+gplot(am10,
+      gmode="graph")
+
+```
+
+Okay, so, after 4 and a half hours I couldnt get the newtwork to run then my R had issues, now I cant get additonal code to go, Im not even trying to plot the network anymore, if you notice I coded that out. My compture is not loading anything in anymore, becuase I realize the solution I had to taking the zero out of the matrix didnt help. My comptuer kept freezing, I had to restart R several times and twice my computer just randomly shut off. This means my code kept getting deleted. Im not a computer wiz, as Im sure you've figured out by now and this just seems like more excuses, but Im really unsure what to do, because again its just in me loading the data in, not even the code. I did clear the R enviroment too as a "hail mary" and that didnt help. SO, to try and scrape a few points out of the assignment, because I really feel that I probabyl cant afford to loose any, Ill walk through big data (basically spitting out the chapter 14, but I'm trying to show some understanding here, despite the lack of code to show otherwise)and try to add something usefull. 
+
+
+#big datasets
+
+Obviously, this was a large dataset, and I had problems with it. Google, restarting my computer and a small cry session, really didnt help. So Ill discuss what I do know and how to have potentially gone about this: 
+
+the first step to working with your big network, would be to ask what are the consequenses of the network size. There are three main issues with large networks, the time it takes to execute, computer memory and usability (results). Before I started, I knew time was an issue, thanks to the heads up we were given and due to the sheer size, I assumed that usability would also be an issue. It seems that I also had computer issues, so the trifecta occurred. 
+
+In terms of usability, even diffused networks can look complicated and hard to read when plotted, but if you are able to plot the larger network with clearly established subgroups, then the plot can be useful in examining relationships and interactions. When working with large networks it’s important to keep in mind that with closeness centrality with large networks has some drawbacks, as nodes in a large network are often farther away so the measure of closeness tends to have a low variance, making it hard to distinguish between nodes. I think the importance of subgroups and the interactions there then are more amplified, as individual nodes are, as mentioned harder to distinguish.   
+
+There are several ways to reduce the size of the network. One way being to loose some data. If you are aware of the dataset, and understand what may be lost,then elimination is a simple awnser. Reducing edges in a graph is also a good approch, if the data are valued, then you can increase the cut off for counts as ties from greater the 0 on until youre edges have been paired down to a smaller size. * you did this in R code for visual 14.1, and I was also going to do this, though Im not certain that makes the most sense. If the data isnt valued, then you can delete ties that dont have a certain property. 
+
+You could also prune the nodes of the network. Start by removing any nodes without ties, or only have one tie. Depending on your network and if the degree varries widly, then you can keep emilinating nodes until you are left the the nework/ nodes/ties that you desire.You can use Kcores to address the fact that when you delete all nodes with one tie, you may still be left with a bunch of nodes that with just one tie in the network that used to have two ties, but one of the ties was elminated in the previous step. Kcors analysis will delete nodes staring from the most peripherial to the next perhipheral. Kcors are similar to cohesive subgroups, but are more relaxed in practice as it doesnt have to be so cohesive. Sometimes Kcors will not work as the network might be one big compenent, in wich case you can aggregate the nodes. Esentially you focus on the overall interaction and create a "supernode" with all the nodes that fall within. then you'd seperatly analyize the networks.
+
+You could also divid the network and analize it in pieces. If you have a directed network you can break into weak or stong compoenents. You can use clustering to deal with less then perfect partitioning of the network.You could used hierarchial clustering or k-means to cluster. 
+
+Methods such as components, bicompnentns, degree centrailuty, brokerage, structueral holes, ego density, ego betweeness, density, EI index, reciprotcuty, transitivty and Kcors are all efficent and usefull methods to consider when working with a large network. If you have a really powerfull computer (clearly I do not) you could use some of the following, geodesic distances, bewteeness, closenss and profile similarity.
+
+There are also special algorithms that exist for instances of large networks. the louvain method for community detection is once of those. This alogorithm is in two stages, a greedy stage then an aggegating stage.
+
+Overall, large networks are challenging (yes) so we can try to reduce the size in either terms of edges or nodes. If we do reduce the size, you need to be congizant of what is left to use and what elimination means in terms of interpertation. 
+
+
+
+
