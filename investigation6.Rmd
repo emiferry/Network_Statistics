@@ -1,0 +1,316 @@
+---
+title: "invest6"
+author: "Emily"
+date: "7/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# set date for saving and remove -
+date <- Sys.Date()
+
+## libraries -----------------------------------------------------
+required.packages<-c("tidyverse","syuzhet","glmnet","broom","lubridate","rtweet","tidypredict","purrr")
+
+if(!all(required.packages %in% installed.packages())){
+  
+  pckg.to.get<- setdiff(required.packages,installed.packages())
+  
+  install.packages(pckg.to.get,repos = "http://cran.us.r-project.org")
+  
+  
+} else {  
+  
+  print("You have all the required packages")
+}
+
+library(tidyverse)
+library(lubridate)
+library(syuzhet)
+library(rtweet)
+library(broom)
+library(glmnet)
+library(purrr)
+# ----------------------------
+install.packages("graphTweets")
+library(graphTweets)# CRAN release v0.4
+devtools::install_github("JohnCoene/graphTweets")
+
+
+```
+
+
+#For the investigation this week, you should choose a company and analyze it's Twitter network. The goal of this analysis is to identify who you think would be important in the network from a marketing perspective, and why you think that. Here are several things for you to think about as you do this:
+
+#You have a Twitter account, so you can collect Twitter data. I recommend package:rtweet over package:twitteR
+Use rseek.org to get some samples of people working with Twitter. Get the recent ones, as Twitter changed their API and terms radically in mid-2019.
+
+#You will want to filter out tweet streams that didn't start with the company. (For example, CocaCola tweets a lot, but almost solely in response to people who tweet in a problem or complaint.)
+
+WOuldnt this esentially link the company with positive and negative experiances? I sort of feel like you'd be ruling out a big interaction that occurs? Like for example, Wendy's is known for their off beat responses to to customer compaints and mentions. So they're responses sort of create its own subgroup of people retweeting responses and sharing them. Like if you only look at the "orgnaic" tweets of the company youre ruling out a portion of the brand.
+
+#A lot of people tag a corporation when they what to get an advertising boycott going against another company (e.g., asking CocaCola to not advertise on Facebook) or when they want to boycott the company. Should you use those in your network? If so, why and how?
+Use the data you gather to create a network
+
+
+
+#Which of the node characteristics/centralities describe someone who is important in a Twitter network? Does it matter if someone is a follower or a friend?
+
+
+
+#Which edge types for a twitter network (e.g., retweet, hashtag) are important for this? What relative weight do you give these different types?
+
+
+
+
+
+#What additional data might be helpful to you here? (Do NOT go to get it; I suspect that your Developer account application said that you wouldn't be doing that!)
+
+
+
+#There isn't a lot out there on using Twitter this way; I suspect that most of the work people do in this field is proprietary, and hence, unavailable to you. (OK, I more than suspect; my limited corporate contacts have indicated to me that if they use Twitter, they won't talk about it.)
+
+
+##The data: 
+
+You said from a marketing prespective, and then you reference filtering out tweet "streams" that didnt originate from the company. I'm guessing you want us to look at a specific company, however, often its what/ the conversations linking a group of people on twitter that can influence marketing. Trends appear and affect searches, the prespective of some and emerging topics flare as a results. 
+
+Historically, with the age of social media, social media has impacted the way people protest and magnified the impact/reach of movements. With recent political and ethical/socially justic issues trending, there are several topics worth exploring. As you mentioned above, Facebook is being called out currently for its continued authorization of hate speech and hate speech rhetoric that appears on feeds. the drive for policy changes is so strong that many companies are particiapting in a protest in which they will not be spending advertising money on the platform. There is also the BLM movement, which is widespread and connecting people on social media as we as a society strive for equality that is long overdue. the span of this movement is linking people and increasing momentum. There's CVOID-19 that's sparked a #wearamask hashtag, also spreading this treding "debate". At this point I have now spent an obscene amount of time debating what I want to explore and what I want to look at trying to gauge what it is you are looking for us to do. Im just going to do something, because I need to move on. 
+
+Since Im in the media dept of an agency, Client's pulling advertising from FB to participate in the protest, Ill explore that because I think that the #BLM will result in a huge data set, that Im not sure how to exactly filter or the dynamics behind this widespread movement... 
+
+#FacebookProtest 
+#FacebookDown 
+
+
+```{r}
+## twitter set up ---------------------------------------------------------------
+
+#my api
+app.name<-"emiferry_api"
+customer.key<-"FJJWq0L4i8o0Nnff7SScHeOP3 "
+customer.secret<-"oPv1vLxBByxGVuI6Dazr0WkAEEaAXRRiDizahHiFADwCN1tXMO"
+
+token<-create_token(app = app.name , 
+                    consumer_key = customer.key ,
+                    consumer_secret = customer.secret)
+
+
+library(rtweet)
+#facebookDown tweets 
+
+tweets<-search_tweets("#facebookdown",n= 700, include_rts = FALSE, token = token)
+#get the edges using gt_edges 
+#build the Igraph objest uing gt_graph and collect results with gt_collect 
+ 
+tweets %>%
+  gt_edges(screen_name, mentions_screen_name) %>%
+  gt_graph()->graph
+
+class(graph)
+
+#we need the nodes too, we only used the edges 
+
+tweets %>%
+  gt_edges(screen_name, mentions_screen_name)%>%
+  gt_nodes() %>%
+  gt_collect()->graph 
+
+lapply(graph,nrow) #not as big as i was hoping but ... $edges 71, $nodes, 89 
+
+lapply(graph, names)
+
+```
+
+```{r}
+
+tweets %>% 
+  gt_edges(screen_name, mentions_screen_name) %>% 
+  gt_nodes(meta = TRUE) %>% 
+  gt_collect() -> graph
+
+#take out the NA metadata that is retuned 
+
+library(dplyr)
+install.packages("sigmajs")
+library(sigmajs)
+
+tweets %>% 
+  gt_edges(screen_name, mentions_screen_name) %>% 
+  gt_nodes() %>% 
+  gt_collect() -> gt
+
+nodes <- gt$nodes %>% 
+  mutate(
+    id = nodes,
+    label = nodes,
+    size = n,
+    color = "blue"  # this should be the facebook color code.. but I think its prob not right it wasnt so I just did blue
+  ) 
+
+edges <- gt$edges %>% 
+  mutate(
+    id = 1:n()
+  )
+
+sigmajs() %>% 
+  sg_force_start() %>% 
+  sg_nodes(nodes, id, label, size, color) %>% 
+  sg_edges(edges, id, source, target) %>% 
+  sg_force_stop(10000)
+
+
+
+```
+
+look at the communities - take an igraph object from gt_graph look at the commuties using igrpah fun
+```{r}
+
+tweets %>% 
+  gt_edges(screen_name, mentions_screen_name) %>% 
+  gt_graph() -> g
+
+class(g)
+
+#user hashtags... 
+tweets <- search_tweets("#facebookdown OR #stopthehate", n = 1000, include_rts = FALSE, token = token, lang = "en")
+
+net <- tweets %>% 
+  gt_edges(screen_name, hashtags) %>% 
+  gt_nodes() %>% 
+  gt_collect()
+
+#hashtag passed into the returned by rtweet - created a tibble with edges from screen name and hashtag 
+
+#visualize using simajs- if it wasnt already clear  by the correct use of pipping, Im using some google here 
+
+edges <- net$edges
+nodes <- net$nodes
+
+library(sigmajs)
+
+#sigmajs() %>% okay having a hard time getting the visual and following what it is telling me 
+edges$id <- seq(1, nrow(edges))
+nodes$id <- nodes$nodes
+nodes$label <- nodes$nodes
+nodes$size <- nodes$n
+nodes$color <- ifelse(nodes$type == "user", "#0084b4", "#1dcaff")
+
+sigmajs() %>% 
+  sg_nodes(nodes, id, size, label) %>% 
+  sg_edges(edges, id, source, target) %>% 
+  sg_layout() %>% 
+  sg_cluster(colors = c("#0C46A0FF", "#41A5F4FF")) %>% 
+  sg_settings(
+    edgeColor = "default",
+    defaultEdgeColor = "#d3d3d3"
+  ) %>% 
+  sg_neighbours()
+
+#sigmajs()%>%
+?sg_layout
+
+# we get a pretty intense network here- which makes sense with the introduction of another hashtag. sO it really highlights the facebookprotest (#facebookdown, since #FacebookProtest didnt yeild any results really) intertwined with whats occuring in the world, potically and socially. 
+
+```
+
+Looking at retweets too 
+
+```{r}
+tweets <- search_tweets("#facebookdown filter:retweets", n = 700, include_rts = TRUE, token = token, lang = "en")
+
+net <- tweets %>% 
+  gt_edges(screen_name, retweet_screen_name) %>% 
+  gt_nodes() %>% 
+  gt_collect()
+
+c(edges, nodes) %<-% net
+
+edges$id <- 1:nrow(edges)
+edges$size <- edges$n
+
+nodes$id <- nodes$nodes
+nodes$label <- nodes$nodes
+nodes$size <- nodes$n
+
+sigmajs() %>% 
+  sg_nodes(nodes, id, size, label) %>% 
+  sg_edges(edges, id, source, target) %>% 
+  sg_layout() %>% 
+  sg_cluster(colors = c("#0C46A0FF", "#41A5F4FF")) %>% 
+  sg_settings(
+    edgeColor = "default",
+    defaultEdgeColor = "#d3d3d3"
+  ) %>% 
+  sg_neighbours()
+
+#our retweets are jut a bunch of small networks, no edges are connecting them, which is interesting to see that you sort of only retweet tweets from your network... makes sense with what we've explored and thinking about twitter. 
+```
+
+these networks with sigmajs are not bad, a little hard on the R script when you are trying to scroll ,but I see merrit in using the for like knitting to an html and having soemthign online someone could interact with. 
+
+You may also pre-process edges before computing the nodes.
+I wasnt entirly certain what this pretained to but : I think possibly this used in finding the shortest path query, skipping over unimportant vertices...??? or reducing the edges while retaining the community of the network? sort of like getting rid of white noise ?? going to try becuase why not?
+
+```{r}
+prep <- function(df){
+  df %>% 
+    group_by(source, target) %>% 
+    summarise(
+      n = sum(n), # number of tweets
+      nchar = sum(nchar(text)) / n # characters per tweet
+    ) %>% 
+    dplyr::ungroup()
+}
+
+gt <- tweets %>% 
+    gt_edges(screen_name, retweet_screen_name, text) %>% 
+    gt_preproc_edges(prep) %>% 
+    gt_nodes()
+
+#gt$edges$id <- 1:nrow(gt$edges)
+gt$nodes$id <- gt$nodes$nodes
+gt$nodes$label <- gt$nodes$nodes
+gt$nodes$size <- gt$nodes$n
+gt$edges$color <- scales::col_numeric(c("blue", "red"), NULL)(gt$edges$nchar)
+
+sigmajs() %>% 
+  sg_nodes(gt$nodes, id, size, label) %>% 
+  sg_edges(gt$edges, id, source, target, color) %>% 
+  sg_layout() 
+
+
+
+#just kidding I am getting Error in `$<-.data.frame`(`*tmp*`, id, value = 1:1006) : replacement has 1006 rows, data has 0
+#which Logically means what Im trying to do doesnt fit with the size/length of the DF I believe, but uncerain of fixing this...... I follow the rest of the code and typed it out for what its supposed to look like but I'm bt sure uf taht will run 
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
